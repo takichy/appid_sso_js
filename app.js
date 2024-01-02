@@ -1,9 +1,16 @@
-const express = require("express");
-const session = require("express-session");
-const passport = require("passport");
-const WebAppStrategy = require("ibmcloud-appid").WebAppStrategy;
+const express = require("express"); // https://www.npmjs.com/package/express
+const session = require("express-session"); // https://www.npmjs.com/package/express-session
+const passport = require("passport"); // https://www.npmjs.com/package/passport
+const WebAppStrategy = require("ibmcloud-appid").WebAppStrategy; // https://www.npmjs.com/package/ibmcloud-appid
+
 const app = express();
 
+// Warning The default server-side session storage implementation, MemoryStore,
+// is purposely not designed for a production environment. It will
+// leak memory under most conditions, it does not scale past a single process,
+// and is meant for debugging and developing.
+// For a list of stores, see compatible session stores below
+// https://www.npmjs.com/package/express-session#compatible-session-stores
 app.use(
   session({
     secret: "123456",
@@ -11,75 +18,65 @@ app.use(
     saveUninitialized: true,
   })
 );
-
-passport.serializeUser((user, cb) => cb(null, user));
-passport.deserializeUser((user, cb) => cb(null, user));
-
 app.use(passport.initialize());
 app.use(passport.session());
+passport.serializeUser((user, cb) => cb(null, user));
+passport.deserializeUser((user, cb) => cb(null, user));
 
 // Configure the SAML strategy
 passport.use(
   new WebAppStrategy({
-    tenantId: "6bbb64ac-1bfd-4b95-bd2c-5c55b110f82d",
-    clientId: "78514749-3b65-4ab7-a73b-10adda29e930",
-    secret: "NzgwYWYyZDEtN2VjZC00NmI5LTk0ZGUtYmVjMGQyNDk2YmE2",
-    oauthServerUrl:
-      "https://eu-de.appid.cloud.ibm.com/oauth/v4/6bbb64ac-1bfd-4b95-bd2c-5c55b110f82d",
+    tenantId: "",
+    clientId: "",
+    secret: "",
+    oauthServerUrl: "",
     redirectUri: "http://localhost:3000/api/iam/callback",
-    samlOptions: {
-      // Store the SAML response in req.user
-      passReqToCallback: true,
-    },
   })
 );
 
-// Define the authentication routes
-app.get("/api/iam/login", passport.authenticate(WebAppStrategy.STRATEGY_NAME)); // {successRedirect: "/",forceLogin: true,}
-
+// Handle Login
 app.get(
-  "api/iam/callback",
+  "/appid/login",
+  passport.authenticate(WebAppStrategy.STRATEGY_NAME, {
+    successRedirect: "/",
+    forceLogin: true,
+  })
+);
+
+// Handle callback
+app.get(
+  "/api/iam/callback",
   passport.authenticate(WebAppStrategy.STRATEGY_NAME),
   (req, res) => {
-    console.log("req.user: ", req.user);
-    // Handle the SAML response
-    // ...
+    console.log("test user: ", req.user);
     res.redirect("/");
   }
 );
 
-app.get("/api/iam/logout", (req, res) => {
-  req.logout(); // WebAppStrategy.logout(req);
+// Handle logout
+app.get("/appid/logout", function (req, res) {
+  WebAppStrategy.logout(req);
   res.redirect("/");
 });
 
-// Define a protected route that requires authentication
-app.get(
-  "/api/iam//protected",
-  passport.authenticate(WebAppStrategy.STRATEGY_NAME),
-  (req, res) => {
-    res.send(`Hello ${req.user.name}!`);
-  }
-);
-
 // Protect the whole app
-app.use(passport.authenticate(WebAppStrategy.STRATEGY_NAME));
+// app.use(passport.authenticate(WebAppStrategy.STRATEGY_NAME));
 
 // Make sure only requests from an authenticated browser session can reach /api
-// app.use("/api", (req, res, next) => {
-//   if (req.user) {
-//     next();
-//   } else {
-//     res.status(401).send("Unauthorized1");
-//   }
-// });
+app.use("/api", (req, res, next) => {
+  if (req.user) {
+    next();
+  } else {
+    res.status(401).send("Unauthorized");
+  }
+});
 
 // The /api/user API used to retrieve name of a currently logged in user
-app.get("/api/iam/user", (req, res) => {
+app.get("/api/user", (req, res) => {
+  console.log(req.session[WebAppStrategy.AUTH_CONTEXT]);
   res.json({
     user: {
       name: req.user.given_name,
-      email: req.user.email,
     },
   });
 });
@@ -87,7 +84,7 @@ app.get("/api/iam/user", (req, res) => {
 // Serve static resources
 app.use(express.static("./public"));
 
-// Start the server
+// Start server
 app.listen(3000, () => {
-  console.log("Server is running on port 3000");
+  console.log("Listening on http://localhost:3000");
 });
