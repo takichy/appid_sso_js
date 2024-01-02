@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>Simple Node Web App</title>
+  </head>
+
+  <body>
+    <h1>Hello SAML!</h1>
+
+    <a href="/api/iam/login" id="login">Login</a>
+
+    <a href="/api/iam/logout" id="logout" style="display: none">Logout</a>
+
+    <p id="user"></p>
+
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+    <script>
+      $().ready(() => {
+        $.get("/api/user").then((resp) => {
+          $("#user").text(
+            "Hello ***" +
+              resp.user.name +
+              " *** your adress mail is: ***" +
+              resp.user.email +
+              " ***"
+          );
+          $("#logout").show();
+          $("#login").hide();
+        });
+      });
+    </script>
+  </body>
+</html>
